@@ -1,35 +1,49 @@
 use crate::Program;
 use heck::SnakeCase;
-use quote::quote;
+use quote::{quote, ToTokens};
+
+/// Build `crate::<parent_path>::__client_accounts_<snake>`
+/// from a path like `ix::deposit_usd_into_pool::DepositUsdIntoPool`.
+fn helper_path_for_client_accounts(
+    anchor_ident: &proc_macro2::TokenStream,
+    snake: &str,
+) -> proc_macro2::TokenStream {
+    let full = anchor_ident.to_string();
+    let mut parts: Vec<&str> = full
+        .split("::")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // last segment is the Accounts type name
+    let _ = parts.pop();
+
+    let helper = format!("__client_accounts_{}", snake);
+    if parts.is_empty() {
+        // Accounts at crate root
+        format!("crate::{helper}").parse().unwrap()
+    } else {
+        // Accounts inside nested module(s)
+        format!("crate::{}::{helper}", parts.join("::")).parse().unwrap()
+    }
+}
 
 pub fn generate(program: &Program) -> proc_macro2::TokenStream {
-    let mut accounts = std::collections::HashMap::new();
-
-    // Go through instruction accounts.
-    for ix in &program.ixs {
-        let anchor_ident = &ix.anchor_ident;
-        // TODO: move to fn and share with accounts.rs.
-        let macro_name = format!(
-            "__client_accounts_{}",
-            anchor_ident.to_string().to_snake_case()
-        );
-        accounts.insert(macro_name, ix.cfgs.as_slice());
-    }
-
-    // Build the tokens from all accounts
-    let account_structs: Vec<proc_macro2::TokenStream> = accounts
+    let account_structs: Vec<proc_macro2::TokenStream> = program
+        .ixs
         .iter()
-        .map(|(macro_name, cfgs)| {
-            let macro_name: proc_macro2::TokenStream = macro_name.parse().unwrap();
+        .map(|ix| {
+            let snake = ix.anchor_ident.to_string().to_snake_case();
+            let helper_path =
+                helper_path_for_client_accounts(&ix.anchor_ident.to_token_stream(), &snake);
+            let cfgs = &ix.cfgs;
+
             quote! {
                 #(#cfgs)*
-                pub use crate::#macro_name::*;
+                pub use #helper_path::*;
             }
         })
         .collect();
-
-    // TODO: calculate the account size and add it as a constant field to
-    //       each struct here. This is convenient for Rust clients.
 
     quote! {
         /// An Anchor generated module, providing a set of structs

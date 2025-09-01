@@ -21,7 +21,6 @@ pub fn gen_accounts_mod(idl: &Idl) -> proc_macro2::TokenStream {
                     if buf.len() < #disc.len() {
                         return Err(anchor_lang::error::ErrorCode::AccountDiscriminatorNotFound.into());
                     }
-
                     let given_disc = &buf[..#disc.len()];
                     if #disc != given_disc {
                         return Err(
@@ -29,7 +28,6 @@ pub fn gen_accounts_mod(idl: &Idl) -> proc_macro2::TokenStream {
                             .with_account_name(stringify!(#name))
                         );
                     }
-
                     Self::try_deserialize_unchecked(buf)
                 }
             };
@@ -43,7 +41,6 @@ pub fn gen_accounts_mod(idl: &Idl) -> proc_macro2::TokenStream {
                             if AnchorSerialize::serialize(self, writer).is_err() {
                                 return Err(anchor_lang::error::ErrorCode::AccountDidNotSerialize.into());
                             }
-
                             Ok(())
                         }
                     }
@@ -112,7 +109,6 @@ pub fn gen_accounts_mod(idl: &Idl) -> proc_macro2::TokenStream {
         /// Program account type definitions.
         pub mod accounts {
             use super::*;
-
             #(#accounts)*
         }
     }
